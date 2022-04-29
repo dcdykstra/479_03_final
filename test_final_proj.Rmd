@@ -1,0 +1,70 @@
+---
+title: "479 (03) Final Project Test"
+author: "Danah Dykstra, Taran Katta, Jordan Livingston, https://github.com/dcdykstra/479_03_final"
+date: "4/15/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(tidytext)
+```
+> Every day, millions of people use Amazon to purchase a wide range of products. In making their decision to actually buy an item, the first thing they will often look at is the star rating and reviews. However, how correlated is star ratings with the reviews that follow? In this paper, we take a look at a Kaggle dataset titled Amazon US Customer Reviews by Cynthia Rempel to understand this relationship. First, we cleaned and organized the data using parallel and ran a regression on Amazon review variables against star rating. Ultimately, we found statistically significant results with both sentiment scores of the reviews as well as the number of helpful votes.
+
+```{r}
+f = read_tsv("amazon_reviews_us_Personal_Care_Appliances_v1_00.tsv") %>% 
+  select(review_body, review_id, star_rating, helpful_votes, vine)
+head(f)
+```
+
+> The dataset is 54.41 GB uncompressed of Amazon product reviews. There are 37 separate tab-separated value datasets that provide different product categories, like electronics, tools, and toys, for example. We will be running 37 separate jobs in a ‘.sh’ file. There is a text file with all the names of the separate review datasets that will be used in the queue, to read in each file separately. Upon running our ‘.sub. file, our R code cleans the data to only include the columns we need ( review id, star rating, review body, vine) and splits the individual datasets into training data (75%) and testing data (25%). The 37 training and testing datasets are merged together in order to cleanly run our regression analysis. 
+
+> For each file, we attached relevant sentiment scores to the reviews through the use of an R package (“tidytext”). This package gave us access to a dataset of sentiment scores in relation to different descriptive words including “abandoned” and “favored” for example attached with different numerical scores from 1-5 where 1 is the most negative sentiment and 5 is the most positive. We then used R code to calculate sentiment scores for different reviews based on the average sentiment score of the tidytext words present inside of the review. For example, if two tidytext words “favored” and “upset” show up in the review and “favored” has a score of 4 while “upset” has a score of 2, the average sentiment score for the review is 3. 
+
+```{r}
+sent <- f %>%
+  unnest_tokens(word, review_body) %>% 
+  inner_join(get_sentiments("afinn")) %>% 
+  group_by(review_id, star_rating, helpful_votes, vine) %>% 
+  summarize(sentiment = mean(value))
+
+smp_size <- floor(0.75 * nrow(sent))
+train_ind <- sample(seq_len(nrow(sent)), size = smp_size)
+
+train <- sent[train_ind, ]
+test <- sent[-train_ind, ]
+
+head(get_sentiments("afinn"))
+```
+
+> After consolidating sentiment scores, we used our sentiment score and helpful factors as the x variables for our regression against star rating to predict the correlation between the reviews and star rating. Then we set a regression between this sentiment score, vine, and the review’s helpful votes against the star rating. The summary of our model showed us that vine is not a significant predictor of star rating. We also created a new data frame that contained the predicted star_rating as well as the true star rating. To better visualize our results, we then created density plots using this dataframe showing the distribution of predicted ratings for each true star rating (1-5). 
+
+```{r}
+lm = lm(star_rating~sentiment+helpful_votes+vine, data=train)
+summary(lm)
+```
+
+```{r}
+y_test = predict(lm, test)
+y_true = test$star_rating
+y = data.frame(y_test, y_true = as.factor(y_true))
+
+build_plot <- function(rating, df){
+  temp <- df %>% 
+    filter(y_true == rating)
+  ggplot(temp)+
+    geom_density(aes(x = y_test))+
+    geom_vline(aes(xintercept = rating))+
+    labs(title = paste("Density Plot for Star Rating ", rating))
+}
+
+# lapply(1:5, build_plot, df = y)
+build_plot(4, y)
+```
+
+> Above we can see the density plot for star rating = 4. The distribution seems to peak around the true value, 4. This means that most of our predictions for star rating in the test dataset where the true values are 4 are close to being correct. It is worth noting that since we ran a linear regression, our predicted star ratings are not actually discrete but rather continuous variables. We felt like this was a necessary addition in order to have more clarity in possible future models where ratings may not necessarily be fully discrete.
+
+> The main weakness in our analysis is that the sentiment scores do not account for double negatives. The only way to fix this weakness is to alter the sentiment scores or create our own, which is time-consuming. Another weakness is that the tidytext package only includes about 2500 words, and ignores words it doesn’t know. This creates lots of room for error on descriptor words not included in sentiment analysis.
+
+> Ultimately, we found that Amazon review sentiment score and helpful votes are predictive of the star rating. This is a positive sign, as generally, we can understand that the people writing reviews are also representing the general contribution to star ratings and giving a streamlined narrative for the product. One flaw we did see in our work is that the use of the word “not” and similar use cases were not accounted for. “Not favored” has a whole different meaning than just “favored” and should be assigned a far different sentiment score. If we can account for this, we believe that the accuracy of our analysis could reach a new, higher level.
