@@ -1,0 +1,17 @@
+universe = vanilla
+log    =    log/job2$(Cluster)_$(Process).log
+error  =  error/j2_$(Cluster)_$(Process).err
+output = output/j2_$(Cluster)_$(Process).out
+
+executable = ./post.sh
+
+should_transfer_files = YES
+when_to_transfer_output = ON_EXIT
+
+transfer_input_files = http://proxy.chtc.wisc.edu/SQUID/chtc/R402.tar.gz, packages.tar.gz, proj.R, train.csv, test.csv
+
+request_cpus = 1
+request_memory = 3GB
+request_disk = 3GB
+
+queue

@@ -1,0 +1,19 @@
+universe = vanilla
+log    =    log/5jobs$(Cluster)_$(Process).log
+error  =  error/$(Cluster)_$(Process).err
+output = output/$(Cluster)_$(Process).out
+
+executable = ./exec.sh
+
+arguments = $(tsv) afinn.csv
+
+should_transfer_files = YES
+when_to_transfer_output = ON_EXIT
+
+transfer_input_files = http://proxy.chtc.wisc.edu/SQUID/chtc/R402.tar.gz, packages.tar.gz, pre_proj.R, /staging/groups/STAT479_tkattagroup/$(tsv), afinn.csv
+
+request_cpus = 1
+request_memory = 1GB
+request_disk = 1GB
+
+queue tsv from filenames.txt
